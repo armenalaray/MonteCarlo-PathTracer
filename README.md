@@ -1,1 +1,1 @@
-Hello **World** and my *name* is Alejandro and [go to my name](https://www.desmos.com/scientific?lang=es)
+Wrote an offline raytracer from scratch in C++ using Object Oriented Programming (OOP), thanks to Peter Shirley´s Raytracing series and ScratchAPixel´s awesome tutorials for reflection and refraction materials.
