@@ -1,4 +1,7 @@
 # Monte Carlo PathTracer
-Wrote a Monte Carlo Pathtracer
+Wrote a Monte Carlo Pathtracer from scratch in C++ using Object Oriented Programming.
+I used PDFs to sample important places in the scene.
 
-![WhatsApp Image 2024-10-17 at 12 16 43_2faf4244](https://github.com/user-attachments/assets/bd84e186-8512-4ea1-a025-fa0426ac3807)
+
+
+
