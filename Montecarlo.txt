@@ -1,0 +1,65 @@
+Cual 1
+
+p de que caiga n el circulo es areal del circulo / area total = pi * 1 / 2*2
+
+4 * p(X) aprox pi 
+
+p de que caiga en el cuadrado = area_total / area_total = 1
+
+sqrt N lado 
+
+lado * lado = N
+
+0 - 1000 / 1000
+
+0 - 1
+
+0 - 2
+
+-1 - 1
+
+
+.	.	.	.	.	.------>
+	
+
+
+
+X - 5
+
+I
+
+Y 5
+
+Z 5
+
+I				-
+
+
+Uniform Sampling!
+
+Importance sampling
+
+I = 2.657176315074
+
+importance
+
+Constant
+
+I = 2.657176315074
+
+Linear
+
+I = 2.661371366375
+
+Quadratic
+
+I = 2.666666666667
+
+
+
+
+
+
+
+
+

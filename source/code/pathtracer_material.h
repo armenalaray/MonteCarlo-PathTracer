@@ -13,16 +13,36 @@
 #ifndef PATHTRACER_MATERIAL_H
 #define PATHTRACER_MATERIAL_H
 
+/*
+Porque ese ray 
+*/
+struct scatter_record
+{
+    ray specular_ray;
+    bool is_specular;
+    vec3 attenuation;
+    shared_ptr<pdf> pdf_ptr;
+};
 
 class material
 {
 	public:
-	virtual bool Scatter(const ray& RayIn, const hit_record& Rec, vec3& attenuation, ray& Scattered) const = 0;
-	virtual vec3 Emit(float u, float v, vec3 p)
-	{
-		return vec3(0,0,0);
-	}
-	virtual ~material();
+	virtual bool Scatter(const ray& RayIn, const hit_record& HRec, scatter_record & SRec) const
+    {
+        return false;
+    }
+    
+    virtual float Scattering_Pdf(const ray& RayIn, const hit_record & Rec, const ray & Scattered) const
+    {
+        return false;
+    }
+    
+    virtual vec3 Emit(const ray& RayIn, const hit_record& rec, float u, float v, vec3 p) const 
+    {
+        return vec3(0,0,0);
+    }
+    
+    virtual ~material();
 };
 
 material::~material(){}
@@ -46,13 +66,22 @@ class lambertian : public material
 	shared_ptr<texture> albedo;
 	lambertian(shared_ptr<texture> albedo_) : albedo(albedo_) {}
 	~lambertian() {};
-	virtual bool Scatter(const ray& RayIn, const hit_record& Rec, vec3& attenuation, ray& Scattered) const
-	{
-		vec3 p = Rec.p + Rec.Normal + RandomInUnitSphere();
-		Scattered = ray(Rec.p, p - Rec.p, RayIn.Time);
-		attenuation = albedo->Value(Rec.u,Rec.v,Rec.p);
-		return true;
-	}
+    
+    virtual bool Scatter(const ray& RayIn, const hit_record& HRec, scatter_record & SRec) const
+    {
+        SRec.is_specular = false;
+        SRec.attenuation = albedo->Value(HRec.u, HRec.v, HRec.p);
+        SRec.pdf_ptr = make_shared<cosine_pdf>(HRec.Normal);
+        return true;
+    }
+    
+    
+    virtual float Scattering_Pdf(const ray& RayIn, const hit_record & Rec, const ray & Scattered) const
+    {
+        float cosine = Dot(Rec.Normal, MakeUnitVector(Scattered.Direction));
+        if(cosine < 0) cosine = 0;
+        return cosine / M_PI;
+    }
 };
 
 
@@ -64,14 +93,15 @@ class metal : public material
 	
 	metal(const vec3& albedo_, const float f ) : albedo(albedo_), Fuzz(f) {}
 	~metal(){};
-	virtual bool Scatter(const ray& RayIn, const hit_record& Rec, vec3& attenuation, ray& Scattered) const
-	{
-		vec3 p = Reflect(MakeUnitVector(RayIn.Direction), Rec.Normal); 
-		Scattered = ray(Rec.p, p + Fuzz * RandomInUnitSphere(), RayIn.Time);
-		attenuation = albedo;
-		
-		float d = Dot(Scattered.Direction, Rec.Normal); 
-		return (d > 0);
+    
+    virtual bool Scatter(const ray& RayIn, const hit_record& HRec, scatter_record & SRec) const
+    {
+		vec3 reflected = Reflect(MakeUnitVector(RayIn.Direction), HRec.Normal); 
+        SRec.specular_ray = ray(HRec.p, reflected + Fuzz * RandomInUnitSphere(), RayIn.Time);
+		SRec.attenuation = albedo;
+		SRec.is_specular = true;
+        SRec.pdf_ptr = 0;
+		return true;
 	}
 };
 
@@ -82,7 +112,8 @@ class dielectric : public material
 	
 	dielectric(const float ior_) : ior(ior_) {}
 	~dielectric(){}
-	virtual bool Scatter(const ray& RayIn, const hit_record& Rec, vec3& Attenuation, ray& Scattered) const
+    
+    virtual bool Scatter(const ray& RayIn, const hit_record& HRec, scatter_record & SRec) const
 	{
 		
 #if 0
@@ -132,29 +163,35 @@ class dielectric : public material
 		}
 		return true;
 #else
-		Attenuation = vec3(1.0, 1.0, 1.0);
+        SRec.is_specular = true;
+        SRec.pdf_ptr = 0;
+		SRec.attenuation = vec3(1.0, 1.0, 1.0);
 		
-		vec3 Reflected = Reflect(MakeUnitVector(RayIn.Direction), Rec.Normal); 
+        
+        
+		vec3 Reflected = Reflect(MakeUnitVector(RayIn.Direction), HRec.Normal); 
+        
+		float RefProb = Fresnel(RayIn.Direction, HRec.Normal, 1.0f, ior);
+		
 		vec3 Transmitted;
-		float RefProb = Fresnel(RayIn.Direction, Rec.Normal, 1.0f, ior);
-		
 		if(RefProb < 1.0f)
 		{
-			Refract(RayIn.Direction, Rec.Normal, 1.0f, ior, Transmitted);
-			//RefProb = Schlick(RayIn.Direction, Rec.Normal, 1.0f, ior);
+			Refract(RayIn.Direction, HRec.Normal, 1.0f, ior, Transmitted);
+			//RefProb = Schlick(RayIn.Direction, HRec.Normal, 1.0f, ior);
 		}
 		
 		if(RandNum0ToLessThan1() < RefProb)
 		{
-			Scattered = ray(Rec.p, Reflected, RayIn.Time);
+			SRec.specular_ray = ray(HRec.p, Reflected, RayIn.Time);
 		}
 		else
 		{
-			Scattered = ray(Rec.p, Transmitted, RayIn.Time);			
+			SRec.specular_ray = ray(HRec.p, Transmitted, RayIn.Time);			
 		}
+        
 		return true;
 #endif
-
+        
 	}
 };
 
@@ -168,12 +205,19 @@ class diffuse_light : public material
 		return false; 
 	}
 	
-	virtual vec3 Emit(float u, float v, vec3 p)
+	virtual vec3 Emit(const ray& RayIn, const hit_record& rec, float u, float v, vec3 p) const
 	{
-		return Emitted->Value(u,v,p);
-	}
-	
-	~diffuse_light() {};
+        if(Dot(rec.Normal, RayIn.Direction))
+        {
+            return Emitted->Value(u,v,p);
+        }
+        else
+        {
+            return vec3(0,0,0);
+        }
+    }
+    
+    ~diffuse_light() {};
 };
 
 

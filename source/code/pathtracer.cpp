@@ -1,19 +1,42 @@
 
 #include "pathtracer.h"
 
-vec3 Color(ray R, shared_ptr<hitable> World, int Depth)
+/*
+Color es recursiva
+*/
+
+
+vec3 Color(ray R, shared_ptr<hitable> World, hitable * light_shape,  int Depth)
 {
-	hit_record Rec;
-	if(World->Hit(R, 0.001f, FLT_MAX, Rec))
+	hit_record HRec;
+	if(World->Hit(R, 0.001f, FLT_MAX, HRec))
 	{
-		//vec3 RandomP = rec.p + rec.Normal + RandomInUnitSphere();
-		vec3 Attenuation;
-		ray Scattered;
-		vec3 Emitted = Rec.Material->Emit(Rec.u, Rec.v, Rec.p);
-		if(Depth < 50 && Rec.Material->Scatter(R, Rec, Attenuation, Scattered))
+		vec3 Emitted = HRec.Material->Emit(R, HRec, HRec.u, HRec.v, HRec.p);
+        
+        scatter_record SRec;
+		if(Depth < 50 && HRec.Material->Scatter(R, HRec, SRec))
 		{
 			// NOTE(Alex): This is the light transport equation!!!
-		    return Emitted + Attenuation * Color(Scattered, World, Depth + 1);
+            
+            if(SRec.is_specular)
+            {
+                return SRec.attenuation * Color(SRec.specular_ray, World, light_shape, Depth + 1);
+            }
+            else
+            {
+                
+                //hitable_pdf lightPDF(light_shape, HRec.p);
+                shared_ptr<pdf> GlassPDF = make_shared<hitable_pdf>(light_shape, HRec.p);
+                
+                mixture_pdf MixPDF(GlassPDF, SRec.pdf_ptr);
+                
+                ray Scattered = ray(HRec.p, MixPDF.generate(), R.Time);
+                
+                /*Esta cosa no esta normalizada!*/
+                float pdf_val = MixPDF.value(Scattered.Direction);
+                
+                return Emitted + SRec.attenuation * HRec.Material->Scattering_Pdf(R, HRec, Scattered) * Color(Scattered, World, light_shape, Depth + 1) / pdf_val;
+            }
 		}
 		else
 		{
@@ -242,44 +265,64 @@ shared_ptr<hitable> CornellBox(float Time0, float Time1)
 {
 	vector<shared_ptr<hitable>> List;
 	
-	shared_ptr<texture> TEarth = make_shared<image_texture>("../../source/data/images/earthmap.jpg");
+	//shared_ptr<texture> TEarth = make_shared<image_texture>("../../source/data/images/earthmap.jpg");
 	shared_ptr<texture> TRed = make_shared<constant_texture>(vec3(0.65f, 0.05f, 0.05f));
 	shared_ptr<texture> TGreen = make_shared<constant_texture>(vec3(0.12f, 0.45f, 0.15f));
 	shared_ptr<texture> TWhite = make_shared<constant_texture>(vec3(0.73f, 0.73f, 0.73f));
-	shared_ptr<texture> TLight = make_shared<constant_texture>(vec3(15.f, 15.f, 15.f));
-	shared_ptr<texture> TTriBar = make_shared<uvw_texture>(vec3(1.f, 0.f, 0.f),vec3(0.f, 1.f, 0.f),vec3(0.f, 0.f, 1.f));
+    shared_ptr<texture> TLight = make_shared<constant_texture>(vec3(15.f, 15.f, 15.f));
+	//shared_ptr<texture> TTriBar = make_shared<uvw_texture>(vec3(1.f, 0.f, 0.f),vec3(0.f, 1.f, 0.f),vec3(0.f, 0.f, 1.f));
 	
-	shared_ptr<material> MEarth = make_shared<lambertian>(TEarth);
+    
+	//shared_ptr<material> MEarth = make_shared<lambertian>(TEarth);
 	shared_ptr<material> Red = make_shared<lambertian>(TRed);
 	shared_ptr<material> Green = make_shared<lambertian>(TGreen);
 	shared_ptr<material> White = make_shared<lambertian>(TWhite);
-	shared_ptr<material> Light = make_shared<diffuse_light>(TLight);
-	shared_ptr<material> TriBar = make_shared<diffuse_light>(TTriBar);
-	
-	shared_ptr<hitable> xz0 = make_shared<xz_rect>(2.f,3.f,2.f,3.f, 4.999f, Light);
-	shared_ptr<hitable> yz0 = make_shared<yz_rect>(0.f,5.0f,0.f,5.0f,5.f, Red);
-	shared_ptr<hitable> xz1 = make_shared<xz_rect>(0.f,5.f,0.f,5.f,5.f, White);
-	shared_ptr<hitable> Earth = make_shared<sphere>(vec3(2.0f,1.5f,2.0f), 1.5f, MEarth);
-	
-	List.push_back(make_shared<yz_rect>(0.0f,5.0f,0.0f,5.0f,0.0f, Green));
-	List.push_back(make_shared<flip_normals>(xz0));
-	List.push_back(make_shared<flip_normals>(yz0));
-	List.push_back(make_shared<xz_rect>(0.0f,5.0f,0.0f,5.0f,0.0f, White));
-	List.push_back(make_shared<xy_rect>(0.f,5.f,0.f,5.f,0.f, White));
-	List.push_back(make_shared<flip_normals>(xz1));
-	List.push_back(make_shared<triangle>(vec3(2.0f, 2.0f, 2.0f),vec3(2.0f, 4.0f, 2.0f), vec3(1.0f, 2.0f, 2.0f), TriBar));	
-	List.push_back(make_shared<box>(vec3(3.4f,0,3.4f), vec3(4.2f,1,4.2f), Red));	
-	List.push_back(make_shared<box>(vec3(3.4f,0,3.4f), vec3(4.2f,1,4.2f), Red));	
-	List.push_back(make_shared<rotate_y>(-90.0f, Earth));
-	//List.push_back(make_shared<triangle_mesh>("../../source/data/models/cow.geo", TriBar));
+    
+    shared_ptr<material> Aluminum = make_shared<metal>(vec3(0.8,0.85,0.88),0.0f);
+    shared_ptr<material> Glass = make_shared<dielectric>(1.5f);
+    
+    shared_ptr<material> Light = make_shared<diffuse_light>(TLight);
+    //shared_ptr<material> TriBar = make_shared<diffuse_light>(TTriBar);
+    
+    
+    shared_ptr<hitable> xz0 = make_shared<xz_rect>(2.f,3.f,2.f,3.f, 4.999f, Light);
+    shared_ptr<hitable> yz0 = make_shared<yz_rect>(0.f,5.0f,0.f,5.0f,5.f, Red);
+    shared_ptr<hitable> xz1 = make_shared<xz_rect>(0.f,5.f,0.f,5.f,5.f, White);
+    //shared_ptr<hitable> Earth = make_shared<sphere>(vec3(2.0f,1.5f,2.0f), 1.5f, MEarth);
+    
+    List.push_back(make_shared<yz_rect>(0.0f,5.0f,0.0f,5.0f,0.0f, Green));
+    List.push_back(make_shared<flip_normals>(xz0));
+    List.push_back(make_shared<flip_normals>(yz0));
+    List.push_back(make_shared<xz_rect>(0.0f,5.0f,0.0f,5.0f,0.0f, White));
+    List.push_back(make_shared<xy_rect>(0.f,5.f,0.f,5.f,0.f, White));
+    List.push_back(make_shared<flip_normals>(xz1));
+    //List.push_back(make_shared<triangle>(vec3(2.0f, 2.0f, 2.0f),vec3(2.0f, 4.0f, 2.0f), vec3(1.0f, 2.0f, 2.0f), TriBar));	
+    //shared_ptr<hitable> box_1 = make_shared<box>(vec3(3.1f,0,3.1f), vec3(4.2f,1.1f,4.2f), White);
+    
+    shared_ptr<hitable> box_2 = make_shared<box>(vec3(1.1f,0,1.1f), vec3(2.5f,3,2.5f), White);
+    
+    //List.push_back(make_shared<rotate_y>(-20.0f, box_1));	
+    
+    List.push_back(make_shared<sphere>(vec3(4.0f,1.0f,4.0f), 1.0f, Glass));
+    List.push_back(make_shared<rotate_y>(20.0f, box_2));	
+    //List.push_back(make_shared<rotate_y>(-90.0f, Earth));
+    //List.push_back(make_shared<triangle_mesh>("../../source/data/models/cow.geo", TriBar));
 #if 0
-	vector<shared_ptr<hitable>>::pointer ptr = &List[0];
-	return make_shared<bvh_node>(ptr, List.size(), Time0, Time1);
+    vector<shared_ptr<hitable>>::pointer ptr = &List[0];
+    return make_shared<bvh_node>(ptr, List.size(), Time0, Time1);
 #else
-	return make_shared<hitable_list>(List);
+    return make_shared<hitable_list>(List);
 #endif
 }
 
+inline vec3 de_nan(const vec3 & c)
+{
+    vec3 temp = c;
+    if(!(temp[0] == temp[0])) temp[0] = 0;
+    if(!(temp[1] == temp[1])) temp[1] = 0;
+    if(!(temp[2] == temp[2])) temp[2] = 0;
+    return temp;
+}
 
 int main(int ArgumentCount, char ** Arguments)
 {
@@ -290,10 +333,10 @@ int main(int ArgumentCount, char ** Arguments)
 	
 	float AspectRatio = 16.0f / 9.0f;
     
-	const int Height = 128;
+	const int Height = 400;
     const int Width = static_cast<int>(AspectRatio * Height); 
 	
-	int SamplesPerPixel = 100;
+	int SamplesPerPixel = 64;
 	float Time0 = 0.0f;
 	float Time1 = 1.0f;
     
@@ -319,7 +362,21 @@ int main(int ArgumentCount, char ** Arguments)
 	//hitable * World = CornellSmoke();
 	//hitable * World = CreateWorld(Time0, Time1);
 	//hitable * World = Final(Time0, Time1);
-	shared_ptr<hitable> World = CornellBox(Time0, Time1);
+	
+    vector<shared_ptr<hitable>> List;
+    
+    shared_ptr<texture> TLight = make_shared<constant_texture>(vec3(15.f, 15.f, 15.f));
+    shared_ptr<material> Light = make_shared<diffuse_light>(TLight);
+    
+    shared_ptr<material> Glass = make_shared<dielectric>(1.5f);
+    
+    List.push_back(make_shared<xz_rect>(2.f,3.f,2.f,3.f, 4.999f, Light));
+    List.push_back(make_shared<sphere>(vec3(4.0f,1.0f,4.0f), 1.0f, Glass));
+    
+    
+    hitable * hList = new hitable_list (List);
+    
+    shared_ptr<hitable> World = CornellBox(Time0, Time1);
 	
 	if(World)
 	{
@@ -337,7 +394,7 @@ int main(int ArgumentCount, char ** Arguments)
 					float v = (float(j) + RandNum0ToLessThan1()) / float(Height);
 					
 					ray R = Cam.GetRay(u,v);
-					Col += Color(R, World, 0);
+					Col += de_nan(Color(R, World, hList, 0));
 				}
 				Col /= float(SamplesPerPixel);
 				Col = vec3(sqrt(Col[0]),sqrt(Col[1]),sqrt(Col[2])); 

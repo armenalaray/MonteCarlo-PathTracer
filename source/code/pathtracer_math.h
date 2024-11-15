@@ -286,6 +286,13 @@ class vec3
 	{ 
 		e[0] = e0; e[1] = e1; e[2] = e2;
 	}
+    
+    vec3(const vec3 & other)
+    {
+        x = other.x;
+        y = other.y;
+        z = other.z;
+    }
 	
 	// NOTE(Alex): A constant memeber function cannot modify any non static data members or call any member functions that aren´t constant.
 	inline float X() const { return e[0]; }

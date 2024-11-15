@@ -30,7 +30,18 @@ class hitable
 	virtual bool Hit(const ray& r, float tMin, float tMax, hit_record& rec) const = 0;
 	virtual bool BBox(float Time0, float Time1, aabb & OutBBox) const = 0;
 	virtual bool GetCenter(vec3 & OutCenter) const { return false; }
-	virtual ~hitable() = 0;
+    
+    virtual vec3 random(const vec3 & o) const
+    {
+        return vec3(1,0,0);
+    }
+    
+    virtual float pdf_value(const vec3 & o, const vec3 & v) const 
+    {
+        return 0.0f;
+    }
+    
+    virtual ~hitable() = 0;
 };
 
 hitable::~hitable(){}
@@ -299,9 +310,12 @@ class flip_normals : public hitable
 		{
 			rec.Normal = -rec.Normal;
 		}
+        
+        
 		return Result;
 	}
 	
+    
 	virtual bool BBox(float Time0, float Time1, aabb & OutBBox) const
 	{
 		return Hitable->BBox(Time0, Time1, OutBBox);
@@ -378,6 +392,43 @@ class xz_rect : public hitable
 		OutBBox = aabb(vec3(x0, k - 0.0001f, z0), vec3(x1, k + 0.0001f, z1));
 		return true;
 	}	
+    
+    virtual vec3 random(const vec3 & o) const
+    {
+        /*
+Saca la distancia de un punto random a el origen
+*/
+        
+        vec3 radom_point = vec3(x0 + RandNum0ToLessThan1() * (x1 - x0),
+                                k , 
+                                z0 + RandNum0ToLessThan1() * (z1 - z0));
+        
+        return radom_point - o;
+    }
+    
+    
+    virtual float pdf_value(const vec3 & o, const vec3 & v) const
+    {
+        hit_record Rec;
+        
+        /*Lo que el quiere saber es si esta ocluido*/
+        if(Hit(ray(o, v), 0.001, FLT_MAX, Rec))
+        {
+            /*
+Significa que si choco con este objeto
+*/
+            
+            float area = (x1 - x0) * (z1 - z0);
+            float distance_squared = Rec.t * Rec.t * v.SquaredLength();
+            /*Esto ya funciona!*/
+            float cosine = fabs(Dot(v, Rec.Normal) / v.Length());
+            float value = distance_squared / (cosine * area);
+            return value;
+        }
+        
+        return 0.0f;
+    }
+    
 };
 
 bool xz_rect::Hit(const ray& r, float tMin, float tMax, hit_record& rec) const
@@ -457,6 +508,28 @@ class hitable_list : public hitable
 		List = List_;
 	}
 	
+    virtual vec3 random(const vec3 & o) const
+    {
+        int index = int(RandNum0ToLessThan1() * List.size());
+        return List[index]->random(o);
+    }
+    
+    virtual float pdf_value(const vec3 & o, const vec3 & v) const 
+    {
+        float average = 0.0f;
+        
+        float weight = 1.0f/List.size();
+        
+        for(int i = 0; i < List.size(); ++i)
+        {
+            average += List[i]->pdf_value(o, v);
+        }
+        
+        average *= weight;
+        
+        return average;
+    }
+    
 	virtual bool BBox(float Time0, float Time1, aabb & OutBBox) const;
 	virtual bool Hit(const ray& r, float tMin, float tMax, hit_record& rec) const;
 };
@@ -858,6 +931,39 @@ class sphere : public hitable
 		return true; 
 	}
 	
+    virtual vec3 random(const vec3 & o) const
+    {
+        
+        vec3 Distance = Center - o;
+        vec3 Normal = MakeUnitVector(Distance);
+        onb Basis(Normal);
+        
+        return Basis.Transform(random_to_sphere(Radius, Distance.SquaredLength()));
+    }
+    
+    virtual float pdf_value(const vec3 & o, const vec3 & v) const 
+    {
+        
+        hit_record HRec;
+        if(Hit(ray(o,v), 0.001, FLT_MAX, HRec))
+        {
+            /*
+Este es costeta max.
+*/
+            
+            vec3 Distance = Center - o;
+            float distance_squared = Distance.SquaredLength();
+            
+            float cosThetaMax = std::sqrt(1 - (Radius*Radius/distance_squared));
+            
+            float solid_angle = 2.0 * M_PI * (1 - cosThetaMax);
+            return 1.0 / solid_angle;
+        }
+        
+        return 0.0f;
+    }
+    
+    
 	virtual bool BBox(float Time0, float Time1, aabb & OutBBox) const;
 	virtual bool Hit(const ray& r, float tMin, float tMax, hit_record& rec) const;
 	

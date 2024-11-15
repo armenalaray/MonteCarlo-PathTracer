@@ -87,9 +87,13 @@ class lambertian;
 
 #include "pathtracer_math.h"
 #include "pathtracer_random.h"
+#include "onb.h"
 #include "pathtracer_noise.h"
 #include "pathtracer_texture.h"
 #include "pathtracer_hitable.h"
+
+#include "pdf.h"
+
 #include "pathtracer_camera.h"
 #include "pathtracer_material.cpp"
 #include "pathtracer_material.h"

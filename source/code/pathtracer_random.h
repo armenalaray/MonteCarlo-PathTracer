@@ -64,6 +64,37 @@ vec3 RandomInUnitSphere()
 }
 
 
+inline vec3 random_cosine_direction()
+{
+    
+    float r1 = RandNum0ToLessThan1();
+    float r2 = RandNum0ToLessThan1();
+    
+    float phi = 2*M_PI*r1;
+    
+    float z = std::sqrt(1-r2);
+    float x = std::cos(phi)*std::sqrt(r2);
+    float y = std::sin(phi)*std::sqrt(r2);
+    
+    return vec3(x,y,z);
+}
+
+inline vec3 random_to_sphere(float Radius, float distance_squared)
+{
+    float r1 = RandNum0ToLessThan1();
+    float r2 = RandNum0ToLessThan1();
+    
+    float cosThetaMax = std::sqrt(1 - (Radius*Radius/distance_squared));
+    
+    float z = 1 + r2 * (cosThetaMax - 1);
+    float x = std::cos(2*M_PI*r1) * std::sqrt(1 - (z*z));
+    float y = std::sin(2*M_PI*r1) * std::sqrt(1 - (z*z));
+    
+    return vec3(x,y,z);
+}
+
+
+
 #endif
 
 

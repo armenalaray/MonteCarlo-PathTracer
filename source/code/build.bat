@@ -1,8 +1,12 @@
 @echo off
 
+REM cd \source\code\
+
+echo %CD%
+
 set SourceCodePath=%CD%
-set BinRelPath=C:\Source\Raytracer\bin\release
-set BinDebPath=C:\Source\Raytracer\bin\debug
+set BinRelPath=C:\Alejandro\PathTracer\bin\release
+set BinDebPath=C:\Alejandro\PathTracer\bin\debug
 
 set WarnDis= /wd4201 /wd4239 /wd4100 /wd4189 /wd4127 /wd4150 /wd4996
 set CompDebOpt= /nologo /EHsc /Zi /Od /MTd /W4 %WarnDis%    
@@ -11,7 +15,7 @@ set CompRelOpt= /nologo /EHsc /O2 /MT /W4 %WarnDis%
 set LinkDebOpt= /INCREMENTAL:NO /DEBUG:FULL 
 set LinkRelOpt= /INCREMENTAL:NO  
 
-GOTO LT
+
 
 echo ***DEBUG***
 pushd ..\..\bin\debug
@@ -25,8 +29,11 @@ popd
 
 pushd ..\..\out\data
 %BinRelPath%\pathtracer_release.exe > out.ppm
-start C:\AlexPrograms\OpenSeeIt_v0.47.16.4\OpenSeeIt.exe out.ppm
+start C:\Alejandro\OpenSeeIt_v0.47.16.4\OpenSeeIt.exe out.ppm 
 popd
+
+
+
 
 GOTO NOISE_TEST
 
@@ -88,7 +95,7 @@ REM for %%v in ("..\..\out\data\volume.ppm") do start "C:\AlexPrograms\OpenSeeIt
 
 :ESTIMATE_PI
 
-:LT
+GOTO LT
 
 echo ***DEBUG***
 pushd ..\..\bin\debug
@@ -98,6 +105,21 @@ popd
 pushd ..\..\out\data
 %BinDebPath%\lt.exe 
 popd
+
+:LT
+
+GOTO ESTIMATION:
+
+echo ***DEBUG***
+pushd ..\..\bin\debug
+cl %CompDebOpt% /Fo"estimation" %SourceCodePath%\estimation.cpp /link %LinkDebOpt% 
+popd
+
+pushd ..\..\out\data
+%BinDebPath%\estimation.exe 
+popd
+
+:ESTIMATION
 
 REM for %%v in ("..\..\out\data\SSS_*.ppm") do start "C:\AlexPrograms\OpenSeeIt_v0.47.16.4\OpenSeeIt.exe" "%%v"
 
