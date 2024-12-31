@@ -4,4 +4,4 @@ I used PDFs to sample important places in the scene.
 
 It supports caustics and mixture pdfs
 
-![out](https://github.com/user-attachments/assets/3b5a3558-fdf0-470f-ade5-a0f2901dc799)
+![out (3)](https://github.com/user-attachments/assets/7b7824b9-9f2b-44b0-ad15-d783a09677cd)
